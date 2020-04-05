@@ -1,24 +1,58 @@
 var myItems = {
-    availableFloorSpace: 5,
+    availableFloorSpace: 1,
     availableCargoSpace: 100,
-    energy: 10,
+    // ironOre: 2,
+    // energy: 100,
+    iron: 10,
+    silicon: 10,
+}
+
+function haveItems() {
+    for (item in this.args) {
+        if (this.args[item] < 0 && (myItems[item]?myItems[item]:0) < -this.args[item]) return false;
+    }
+    return true;
+}
+
+function haveItems2(ok) {
+    for (item in ok.args) {
+        if (ok.args[item] < 0 && (myItems[item]?myItems[item]:0) < -ok.args[item]) return false;
+    }
+    return true;
 }
 
 var actions = [
     {
+        name: "CrankGenerator",
+        tooltip: `
+Crank Generator
+<i>Without labor nothing prospers</i>
+`,
+        function: craft,
+        args: {
+            energy: 1,
+        },
+        duration: 2,
+        enableOn: function() {return true},
+        usable: function() {return true},
+    },
+    {
         name: "MineAsteroid",
+        tooltip: "Cost: 4 energy",
         function: search,
         args: {
-            ironOre: 0.7,
-            nickelOre: 0.1,
-            cobaltOre: 0.1,
-            siliconOre: 0.1,
+            ironOre: 0.5,
+            siliconOre: 0.5,
+            // nickelOre: 0.1,
+            // cobaltOre: 0.1,
         },
         duration: 4,
-        enabled: true,
+        enableOn: function() {return true},
+        usable: function() {return myItems.energy >= 4},
     },
     {
         name: "SmeltIron",
+        tooltip: "Cost: 2 iron ore, 1 energy",
         function: craft,
         args: {
             ironOre: -2,
@@ -26,10 +60,12 @@ var actions = [
             iron: 1,
         },
         duration: 2,
-        enableOn: function() {return myItems.ironOre >= 2},
+        enableOn: function() {return myItems.energy >= 4},
+        usable: haveItems,
     },
     {
         name: "SmeltSilicon",
+        tooltip: "Cost: 2 silicon ore, 1 energy",
         function: craft,
         args: {
             siliconOre: -2,
@@ -37,48 +73,57 @@ var actions = [
             silicon: 1,
         },
         duration: 2,
-        enableOn: function() {return myItems.siliconOre >= 2},
+        enableOn: function() {return myItems.energy >= 4},
+        usable: haveItems,
     },
     {
         name: "BuildSolarPanel",
+        tooltip: "Cost: 1 silicon, 1 iron",
         function: craft,
         args: {
             silicon: -1,
-            iron: -2,
+            iron: -1,
             solarPanels: 1,
         },
-        duration: 4,
-        enableOn: function() {return myItems.silicon >= 1 && myItems.iron >= 2},
-    },
-    {
-        name: "ExpandSpacecraft",
-        function: craft,
-        args: {
-            iron: -2,
-            availableFloorSpace: 1,
-        },
-        duration: 10,
-        enableOn: function() {return myItems.iron >= 2},
+        duration: 8,
+        enableOn: function() {return myItems.ironOre >= 2 || myItems.siliconOre >= 2},
+        usable: haveItems,
     },
     {
         name: "BuildNutrientStation",
+        tooltip: "Cost: 5 iron",
         function: craft,
         args: {
-            iron: -2,
+            iron: -5,
             availableFloorSpace: -1,
             nutrientStations: 1,
         },
         duration: 4,
-        enableOn: function() {return myItems.iron >= 2 && myItems.availableFloorSpace >= 1},
+        enableOn: function() {return myItems.ironOre >= 2 || myItems.siliconOre >= 2},
+        usable: haveItems,
     },
     {
-        name: "thawCrewMember",
+        name: "ThawCrewMember",
+        tooltip: "<i>Only slight freezerburn</i>",
         function: craft,
         args: {
             crewMembers: 1,
         },
         duration: 10,
-        enableOn: function() {return myItems.nutrientStations >= 1},
+        enableOn: function() {return true},
+        usable: function() {return true},
+    },
+    {
+        name: "ExpandSpacecraft",
+        tooltip: "Cost: 20 iron",
+        function: craft,
+        args: {
+            iron: -20,
+            availableFloorSpace: 1,
+        },
+        duration: 10,
+        enableOn: function() {return haveItems2(this) || myItems.crewMembers >= 1},
+        usable: haveItems,
     },
 ];
 
@@ -89,9 +134,6 @@ var actionsDiv = $( "#actions" );
 
 var state = null;
 var progress = 0;
-var duration = 1;
-var stateEndFunction = null;
-var stateEndFunctionArgs = null;
 
 function updateInventory()
 {
@@ -108,21 +150,22 @@ function updateActions()
         action = actions[i];
         if (!action.enabled && action.enableOn()) action.enabled = true;
         if (action.enabled && !action.button) {
-            // let button = $("<a href='#' id='" + action.name + "Button' class='progress-button' data-loading='" + action.name + "' data-finished='" + action.name + "'>" + action.name + "</a>");
             let button = $("<button>" + action.name + "</button>");
             actions[i].button = button;
             let action2 = action;
             button.click(function(e){
-                if (state != action2.name) {
-                    state = action2.name;
+                if (state != action2) {
+                    state = action2;
                     progress = 0;
-                    duration = action2.duration;
-                    stateEndFunction = action2.function;
-                    stateEndFunctionArgs = action2.args;
                 }
                 updateProgressBar();
             });
-            actionsDiv.append(button);
+            let tooltipDiv = $("<div class='tooltip'><span class='tooltiptext'>" + action.tooltip + "</span></div>");
+            tooltipDiv.append(button);
+            actionsDiv.append(tooltipDiv);
+        }
+        if (action.button) {
+            action.button.prop("disabled",!action.usable());
         }
     }
 }
@@ -132,13 +175,15 @@ function updateProgressBar()
     if (!state) {
         $("#action").text("Resting");
     } else {
-        $("#action").text(state);
+        $("#action").text(state.name);
     }
     $("#progress").val(progress);
 }
 
 function search(itemsAtLocation)
 {
+    myItems.energy -= 4;
+
     let r = Math.random();
     let r2 = 0;
     let item;
@@ -173,8 +218,6 @@ function craft(items)
 
 $(document).ready(function()
 {
-    // $('.progress-button').progressInitialize();
-
     updateInventory();
     updateActions();
     updateProgressBar();
@@ -182,16 +225,18 @@ $(document).ready(function()
     window.setInterval(function()
     {
         if (state) {
-            progress += 20 / duration;
-            $("#" + state + "Button").progressSet(progress);
+            progress += 20 / state.duration;
             if (progress >= 100) {
                 progress = 0;
-                stateEndFunction(stateEndFunctionArgs);
+                state.function(state.args);
+                if (!state.usable()) state = null;
             }
         }
 
-        myItems.energy += myItems.solarPanels ? myItems.solarPanels : 0;
-        if (myItems.nutrientStations) {
+        if (myItems.solarPanels) {
+            myItems.energy += myItems.solarPanels;
+        }
+        if (myItems.nutrientStations && myItems.energy >= myItems.nutrientStations) {
             myItems.energy -= myItems.nutrientStations;
             if (!myItems.food) myItems.food = 0;
             myItems.food += myItems.nutrientStations;
