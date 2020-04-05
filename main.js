@@ -1,10 +1,12 @@
 var myItems = {
     availableFloorSpace: 1,
     availableCargoSpace: 100,
-    // ironOre: 2,
-    // energy: 100,
-    iron: 10,
-    silicon: 10,
+    availableEnergyStorage: 100,
+
+    // energy: 0,
+    // solarPanels: 2,
+    // nutrientStations: 2,
+    // crewMembers: 2,
 }
 
 function haveItems() {
@@ -24,10 +26,7 @@ function haveItems2(ok) {
 var actions = [
     {
         name: "CrankGenerator",
-        tooltip: `
-Crank Generator
-<i>Without labor nothing prospers</i>
-`,
+        tooltip: "Effects: 1 energy",
         function: craft,
         args: {
             energy: 1,
@@ -48,7 +47,10 @@ Crank Generator
         },
         duration: 4,
         enableOn: function() {return true},
-        usable: function() {return myItems.energy >= 4},
+        usable: function() {
+            updateCargoSpace();
+            return myItems.energy >= 4 && myItems.availableCargoSpace >= 1
+        },
     },
     {
         name: "SmeltIron",
@@ -91,7 +93,7 @@ Crank Generator
     },
     {
         name: "BuildNutrientStation",
-        tooltip: "Cost: 5 iron",
+        tooltip: "Cost: 5 iron, 1 floor space",
         function: craft,
         args: {
             iron: -5,
@@ -125,15 +127,47 @@ Crank Generator
         enableOn: function() {return haveItems2(this) || myItems.crewMembers >= 1},
         usable: haveItems,
     },
+    // {
+    //     name: "BuildMatterEnergyConverter",
+    //     tooltip: "Cost: 10 iron, 20 silicon, 1 floor space",
+    //     function: craft,
+    //     args: {
+    //         iron: -10,
+    //         silicon: -20,
+    //         availableFloorSpace: -1,
+    //         matterEnergyConverters: 1,
+    //     },
+    //     duration: 4,
+    //     enableOn: function() {return availableFloorSpace >= 2},
+    //     usable: haveItems,
+    // },
 ];
-
-var speed = 1;
 
 var inventoryDiv = $( "#inventory" );
 var actionsDiv = $( "#actions" );
 
 var state = null;
 var progress = 0;
+var workerAssignmentEnabled = false;
+
+function countAssignedWorkers()
+{
+    let total = 0;
+    for (i in actions) {
+        action = actions[i];
+        if (action.assignedWorkers) total += action.assignedWorkers;
+    }
+    return total;
+}
+
+function updateCargoSpace()
+{
+    myItems.availableCargoSpace = 100
+        - (myItems.ironOre?myItems.ironOre:0)
+        - (myItems.siliconOre?myItems.siliconOre:0)
+        - (myItems.iron?myItems.iron:0)
+        - (myItems.silicon?myItems.silicon:0);
+}
 
 function updateInventory()
 {
@@ -145,7 +179,6 @@ function updateInventory()
 
 function updateActions()
 {
-    // actionsDiv.empty();
     for (i in actions) {
         action = actions[i];
         if (!action.enabled && action.enableOn()) action.enabled = true;
@@ -162,7 +195,32 @@ function updateActions()
             });
             let tooltipDiv = $("<div class='tooltip'><span class='tooltiptext'>" + action.tooltip + "</span></div>");
             tooltipDiv.append(button);
+            action.plusButton = $("<button>+</button>");
+            action.minusButton = $("<button>-</button>");
+            action.workerCountSpan = $("<span>0</span>");
+            if (!workerAssignmentEnabled) {
+                action.plusButton.hide();
+                action.minusButton.hide();
+                action.workerCountSpan.hide();
+            }
+            tooltipDiv.append(action.plusButton);
+            tooltipDiv.append(action.minusButton);
+            tooltipDiv.append(action.workerCountSpan);
             actionsDiv.append(tooltipDiv);
+            actionsDiv.append($("<br />"));
+            if (!action.assignedWorkers) action.assignedWorkers = 0;
+            action.plusButton.click(function(e){
+                if (myItems.crewMembers > countAssignedWorkers()) {
+                    action2.assignedWorkers += 1;
+                    action2.workerCountSpan.text(action2.assignedWorkers)
+                }
+            });
+            action.minusButton.click(function(e){
+                if (action2.assignedWorkers > 0) {
+                    action2.assignedWorkers -= 1;
+                    action2.workerCountSpan.text(action2.assignedWorkers)
+                }
+            });
         }
         if (action.button) {
             action.button.prop("disabled",!action.usable());
@@ -193,8 +251,6 @@ function search(itemsAtLocation)
     }
     if (!myItems[item]) myItems[item] = 0;
     myItems[item] += 1;
-
-    updateInventory();
 }
 
 function craft(items)
@@ -211,10 +267,31 @@ function craft(items)
         if (!myItems[item]) myItems[item] = 0;
         myItems[item] += amount;
     }
-
-    updateInventory();
 }
 
+function killCrewMember()
+{
+    myItems.crewMembers -= 1;
+    for (i in actions) {
+        action = actions[i];
+        if (action.assignedWorkers > 0) {
+            action.assignedWorkers -= 1;
+            action.workerCountSpan.text(action.assignedWorkers)
+            return;
+        }
+    }
+}
+
+function enableWorkerAssignment()
+{
+    workerAssignmentEnabled = true;
+    for (i in actions) {
+        action = actions[i];
+        if (action.plusButton) action.plusButton.show();
+        if (action.minusButton) action.minusButton.show();
+        if (action.workerCountSpan) action.workerCountSpan.show();
+    }
+}
 
 $(document).ready(function()
 {
@@ -222,35 +299,68 @@ $(document).ready(function()
     updateActions();
     updateProgressBar();
 
+    let intoSecond = 0;
+
     window.setInterval(function()
     {
+        let needToUpdateScreen = false;
+
         if (state) {
             progress += 20 / state.duration;
             if (progress >= 100) {
                 progress = 0;
                 state.function(state.args);
                 if (!state.usable()) state = null;
+                needToUpdateScreen = true;
             }
         }
 
-        if (myItems.solarPanels) {
-            myItems.energy += myItems.solarPanels;
-        }
-        if (myItems.nutrientStations && myItems.energy >= myItems.nutrientStations) {
-            myItems.energy -= myItems.nutrientStations;
-            if (!myItems.food) myItems.food = 0;
-            myItems.food += myItems.nutrientStations;
-        }
-        if (myItems.crewMembers) {
-            if (!myItems.food) myItems.food = 0;
-            if (myItems.food < myItems.crewMembers) {
-                myItems.crewMembers = myItems.food;
+        for (i in actions) {
+            action = actions[i];
+            if (action.assignedWorkers > 0) {
+                if (!action.workerProgress) action.workerProgress = 0;
+                action.workerProgress += 20 * action.assignedWorkers / action.duration;
+                if (action.workerProgress >= 100) {
+                    action.workerProgress -= 100;
+                    if (action.usable()) {
+                        action.function(action.args);
+                        needToUpdateScreen = true;
+                    }
+                }
             }
-            myItems.food -= myItems.crewMembers;
         }
-        updateInventory();
-        updateActions();
+
+        intoSecond += 1;
+        if (intoSecond >= 5) {
+            intoSecond = 0;
+
+            if (myItems.solarPanels) {
+                myItems.energy += myItems.solarPanels;
+            }
+            if (myItems.nutrientStations && myItems.energy >= myItems.nutrientStations) {
+                myItems.energy -= myItems.nutrientStations;
+                if (myItems.energy > myItems.availableEnergyStorage) myItems.energy = myItems.availableEnergyStorage;
+                if (!myItems.food) myItems.food = 0;
+                myItems.food += myItems.nutrientStations;
+            }
+            if (myItems.crewMembers) {
+                if (!myItems.food) myItems.food = 0;
+                while (myItems.food < myItems.crewMembers) {
+                    killCrewMember();
+                }
+                myItems.food -= myItems.crewMembers;
+            }
+            needToUpdateScreen = true;
+        }
+
+        if (myItems.crewMembers > 0 && !workerAssignmentEnabled) enableWorkerAssignment();
+
+        if (needToUpdateScreen) {
+            updateCargoSpace();
+            updateInventory();
+            updateActions();
+        }
         updateProgressBar();
-    }, 200 / speed);
+    }, 200);
 
 });
