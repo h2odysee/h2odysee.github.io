@@ -1,6 +1,11 @@
+.action {
+  /*display: block;*/
+}
+
 .tooltip {
   position: relative;
   display: inline-block;
+  /*display: block;*/
 }
 
 .tooltip .tooltiptext {

@@ -2,18 +2,19 @@ var myItems = {
     floorSpace: 2,
     availableFloorSpace: 2,
     availableEnergyStorage: 100,
+    energy: 0,
 
-    // // ironOre: 99,
-    // energy: 100,
+    // // // ironOre: 99,
+    // // energy: 100,
 
-    // // energy: 0,
-    // // solarPanels: 2,
-    // // nutrientStations: 2,
-    // // crewMembers: 2,
-    // // silicon: 100,
-    // // iron: 100,
-    // siliconOre: 10,
-    // ironOre: 10,
+    // energy: 0,
+    // solarPanels: 2,
+    // nutrientStations: 2,
+    // crewMembers: 2,
+    // silicon: 100,
+    // iron: 100,
+    // // siliconOre: 10,
+    // // ironOre: 10,
 }
 
 destroyableItems = [
@@ -26,18 +27,23 @@ destroyableItems = [
     "crewMembers",
     "deadBodies",
     "nutrientStations",
+    "thrusters",
 ];
 
 function haveItems() {
     for (item in this.args) {
-        if (this.args[item] < 0 && (myItems[item]?myItems[item]:0) < -this.args[item]) return false;
+        if (item != "customFunction") {
+            if (this.args[item] < 0 && (myItems[item]?myItems[item]:0) < -this.args[item]) return false;
+        }
     }
     return true;
 }
 
 function haveItems2(ok) {
     for (item in ok.args) {
-        if (ok.args[item] < 0 && (myItems[item]?myItems[item]:0) < -ok.args[item]) return false;
+        if (item != "customFunction") {
+            if (ok.args[item] < 0 && (myItems[item]?myItems[item]:0) < -ok.args[item]) return false;
+        }
     }
     return true;
 }
@@ -51,7 +57,7 @@ var actions = [
             energy: 1,
         },
         duration: 2,
-        enableOn: function() {return true},
+        enableOn: function() {return myItems.explore >= 1},
         usable: function() {return true},
     },
     {
@@ -65,10 +71,10 @@ var actions = [
             // cobaltOre: 0.1,
         },
         duration: 4,
-        enableOn: function() {return true},
+        enableOn: function() {return myItems.explore >= 2},
         usable: function() {
             updateCargoSpace();
-            return myItems.energy >= 4 && myItems.availableCargoSpace >= 1
+            return myItems.energy >= 2 && myItems.availableCargoSpace >= 1
         },
     },
     {
@@ -80,8 +86,8 @@ var actions = [
             energy: -1,
             iron: 1,
         },
-        duration: 2,
-        enableOn: function() {return myItems.energy >= 4},
+        duration: 4,
+        enableOn: function() {return myItems.explore >= 4},
         usable: haveItems,
     },
     {
@@ -93,8 +99,8 @@ var actions = [
             energy: -1,
             silicon: 1,
         },
-        duration: 2,
-        enableOn: function() {return myItems.energy >= 4},
+        duration: 4,
+        enableOn: function() {return myItems.explore >= 4},
         usable: haveItems,
     },
     {
@@ -108,12 +114,12 @@ var actions = [
             solarPanels: 1,
         },
         duration: 8,
-        enableOn: function() {return myItems.ironOre >= 2 || myItems.siliconOre >= 2},
+        enableOn: function() {return myItems.explore >= 5},
         usable: haveItems,
     },
     {
         name: "BuildNutrientStation",
-        tooltip: "Cost: 5 iron, 1 floor space\nEffects: 1 food per second",
+        tooltip: "Cost: 5 iron, 1 floor space\nEffects: 2 food per second",
         function: craft,
         args: {
             iron: -5,
@@ -121,7 +127,7 @@ var actions = [
             nutrientStations: 1,
         },
         duration: 4,
-        enableOn: function() {return myItems.ironOre >= 2 || myItems.siliconOre >= 2},
+        enableOn: function() {return myItems.explore >= 6},
         usable: haveItems,
     },
     {
@@ -132,19 +138,19 @@ var actions = [
             crewMembers: 1,
         },
         duration: 10,
-        enableOn: function() {return true},
+        enableOn: function() {return myItems.explore >= 3},
         usable: function() {return true},
     },
     {
         name: "ExpandSpacecraft",
-        tooltip: "Cost: 10 iron\nEffects: 1 floor space",
+        tooltip: "Cost: 8 iron\nEffects: 1 floor space",
         function: craft,
         args: {
-            iron: -10,
+            iron: -8,
             floorSpace: 1,
         },
         duration: 10,
-        enableOn: function() {return haveItems2(this) || myItems.crewMembers >= 1},
+        enableOn: function() {return myItems.explore >= 8},
         usable: haveItems,
     },
     {
@@ -155,18 +161,18 @@ var actions = [
             energy: -10,
             customFunction: function() {
                 if (!myItems.distance) myItems.distance = 0;
-                if (typeof myItems.thrusters === "undefined") myItems.thrusters = 1;
+                // if (typeof myItems.thrusters === "undefined") myItems.thrusters = 1;
                 myItems.distance += myItems.thrusters / myItems.floorSpace;
             },
         },
         duration: 10,
-        enableOn: function() {return haveItems2(this) && myItems.thrusters >= 1},
+        enableOn: function() {return myItems.explore >= 11},
         usable: function() {return haveItems2(this) && myItems.thrusters >= 1},
         maxWorkers: 1,
     },
     {
         name: "BuildCargoContainer",
-        tooltip: "Cost: 10 iron\nEffects: +100 cargo storage",
+        tooltip: "Cost: 10 iron, 1 floor space\nEffects: +100 cargo storage",
         function: craft,
         args: {
             iron: -10,
@@ -174,24 +180,25 @@ var actions = [
             cargoContainers: 1,
         },
         duration: 4,
-        enableOn: function() {return myItems.ironOre >= 2 || myItems.siliconOre >= 2},
+        enableOn: function() {return myItems.explore >= 9},
         usable: haveItems,
     },
     {
         name: "BuildThruster",
-        tooltip: "Cost: 20 iron, 20 silicon\nEffects 1 thruster",
+        tooltip: "Cost: 10 iron, 30 silicon, 1 floor space\nEffects 1 thruster",
         function: craft,
         args: {
-            iron: -20,
-            silicon: -20,
+            iron: -10,
+            silicon: -30,
+            availableFloorSpace: -1,
             customFunction: function() {
-                if (typeof myItems.thrusters === "undefined") myItems.thrusters = 1;
+                if (typeof myItems.thrusters === "undefined") myItems.thrusters = 0;
                 myItems.thrusters += 1;
                 actions[8].args.energy = -10 * myItems.thrusters;
             },
         },
         duration: 10,
-        enableOn: function() {return myItems.ironOre >= 10},
+        enableOn: function() {return myItems.explore >= 10},
         usable: haveItems,
     },
     {
@@ -203,8 +210,23 @@ var actions = [
             energy: 1,
         },
         duration: 2,
-        enableOn: function() {return myItems.siliconOre > 0 || myItems.ironOre > 0 || myItems.deadBodies > 0},
+        enableOn: function() {return myItems.explore >= 7},
         usable: haveItems,
+    },
+    {
+        name: "ExploreShip",
+        tooltip: "<i>These corridors go on forever</i>",
+        function: craft,
+        args: {
+            explore: 1,
+            customFunction: function() {
+                actions[12].duration = 4 + 2 * (myItems.explore+1);
+            },
+        },
+        duration: 4,
+        enableOn: function() {return true},
+        disableOn: function() {return myItems.explore >= 11},
+        usable: function() {return (myItems.explore?myItems.explore:0) < 11},
     },
 ];
 
@@ -225,27 +247,41 @@ function countAssignedWorkers()
     return total;
 }
 
+var maxCargoSpace = 0;
 function updateCargoSpace()
 {
-    myItems.availableCargoSpace = 30 +
-        (myItems.cargoContainers?myItems.cargoContainers:0) * 100
+    maxCargoSpace = 30 + (myItems.cargoContainers?myItems.cargoContainers:0) * 100;
+    myItems.availableCargoSpace = maxCargoSpace
         - (myItems.ironOre?myItems.ironOre:0)
         - (myItems.siliconOre?myItems.siliconOre:0)
         - (myItems.iron?myItems.iron:0)
-        - (myItems.silicon?myItems.silicon:0);
+        - (myItems.silicon?myItems.silicon:0)
+        - (myItems.deadBodies?myItems.deadBodies:0);
 
     myItems.availableFloorSpace =
         (myItems.floorSpace?myItems.floorSpace:0)
         - (myItems.solarPanels?myItems.solarPanels:0)
         - (myItems.nutrientStations?myItems.nutrientStations:0)
-        - (myItems.cargoContainers?myItems.cargoContainers:0);
+        - (myItems.cargoContainers?myItems.cargoContainers:0)
+        - (myItems.thrusters?myItems.thrusters:0);
 }
 
 function updateInventory()
 {
     inventoryDiv.empty();
+    if (myItems.explore >= 5) inventoryDiv.append("<div>floor space: " + (myItems.floorSpace - myItems.availableFloorSpace) + "/" + myItems.floorSpace + "</div>");
+    if (myItems.explore >= 2) inventoryDiv.append("<div>cargo: " + (maxCargoSpace - myItems.availableCargoSpace) + "/" + maxCargoSpace + "</div>");
+    if (myItems.explore >= 1) inventoryDiv.append("<div>energy: " + myItems.energy + "/" + myItems.availableEnergyStorage + "</div>");
+    inventoryDiv.append("<br />");
     for (item in myItems) {
-        inventoryDiv.append("<div>" + item + ": " + myItems[item] + "</div>");
+        if (item != "floorSpace" &&
+            item != "availableFloorSpace" &&
+            item != "availableEnergyStorage" &&
+            item != "energy" &&
+            item != "availableCargoSpace" &&
+            item != "explore") {
+            inventoryDiv.append("<div>" + item + ": " + myItems[item] + "</div>");
+        }
     }
 }
 
@@ -254,7 +290,7 @@ function updateActions()
     for (i in actions) {
         action = actions[i];
         if (!action.enabled && action.enableOn()) action.enabled = true;
-        if (action.enabled && !action.button) {
+        if (action.enabled && !action.disabled && !action.button) {
             let button = $("<button>" + action.name + "</button>");
             actions[i].button = button;
             let action2 = action;
@@ -265,7 +301,9 @@ function updateActions()
                 }
                 updateProgressBar();
             });
+            let actionDiv = $("<div class='action'></div>");
             let tooltipDiv = $("<div class='tooltip'><span class='tooltiptext'>" + action.tooltip + "</span></div>");
+            actionDiv.append(tooltipDiv);
             tooltipDiv.append(button);
             action.plusButton = $("<button>+</button>");
             action.minusButton = $("<button>-</button>");
@@ -278,16 +316,12 @@ function updateActions()
             tooltipDiv.append(action.plusButton);
             tooltipDiv.append(action.minusButton);
             tooltipDiv.append(action.workerCountSpan);
-            actionsDiv.append(tooltipDiv);
+            actionsDiv.append(actionDiv);
+            action.actionDiv = actionDiv;
             if (action.name == "ConvertMatterToEnergy") {
                 convertDropdown = $("<select id='matter'></select>");
                 actionsDiv.append(convertDropdown);
                 convertDropdown.append($("<option value='nothing'>Select an item to destroy...</option>"));
-                // for (item in myItems) {
-                //     if (destroyableItems.includes(item)) {
-                //         convertDropdown.append($("<option value='" + item + "'>" + item + "</option>"));
-                //     }
-                // }
                 for (i in destroyableItems) {
                     item = destroyableItems[i];
                     convertDropdown.append($("<option value='" + item + "'>" + item + "</option>"));
@@ -297,9 +331,10 @@ function updateActions()
                         energy: 1,
                     };
                     actions[11].args[convertDropdown.val()] = -1;
+                    updateActions();
                 });
             }
-            actionsDiv.append($("<br />"));
+            // actionsDiv.append($("<br />"));
             if (!action.assignedWorkers) action.assignedWorkers = 0;
             action.plusButton.click(function(e){
                 if (action2.maxWorkers) {
@@ -320,6 +355,13 @@ function updateActions()
                 }
                 updateActions();
             });
+        }
+            // console.log(action.enabled, action.disableOn);
+        if (action.enabled && action.disableOn && action.disableOn()) {
+            action.disabled = true;
+            action.button = null;
+            action.actionDiv.remove();
+            action.assignedWorkers = 0;
         }
         if (action.button) {
             let disabled = !action.usable();
@@ -455,7 +497,7 @@ $(document).ready(function()
             if (myItems.nutrientStations && myItems.energy >= myItems.nutrientStations) {
                 myItems.energy -= myItems.nutrientStations;
                 if (!myItems.food) myItems.food = 0;
-                myItems.food += myItems.nutrientStations;
+                myItems.food += myItems.nutrientStations * 2;
             }
             if (myItems.energy > myItems.availableEnergyStorage) myItems.energy = myItems.availableEnergyStorage;
             if (myItems.crewMembers) {
