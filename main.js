@@ -518,6 +518,6 @@ $(document).ready(function()
             updateActions();
         }
         updateProgressBar();
-    }, 20);
+    }, 200);
 
 });
